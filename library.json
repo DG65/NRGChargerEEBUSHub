@@ -1,0 +1,12 @@
+{
+  "id": "{4405F7A1-3518-498C-9ECB-3A04587B5D35}",
+  "author": "DG65",
+  "name": "NRG-Stack ChargerEEBUSHub",
+  "url": "https://github.com/DG65/NRGChargerEEBUSHub",
+  "compatibility": {
+    "version": "9.0"
+  },
+  "version": "0.1.0",
+  "build": 1,
+  "date": 1793919600
+}

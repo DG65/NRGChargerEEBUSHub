@@ -1,0 +1,20 @@
+{
+  "id": "{45A53474-81B3-4A59-BDD9-B0C3CCBFE6BF}",
+  "name": "ChargerEEBUSHub",
+  "type": 3,
+  "vendor": "",
+  "aliases": [
+    "NRG-Stack ChargerEEBUSHub",
+    "Wallbox EEBUS",
+    "EV charger EEBUS"
+  ],
+  "url": "https://github.com/DG65/NRGChargerEEBUSHub",
+  "parentRequirements": [
+    "{26D4DA14-6C0D-4686-AE00-D23234BAD90D}"
+  ],
+  "childRequirements": [],
+  "implemented": [
+    "{12D8B8A8-3EE7-491F-A68A-D632304165D4}"
+  ],
+  "prefix": "CHEEB"
+}
