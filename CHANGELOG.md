@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.1 (Build 2, 07.11.2026)
+
+- Rückmeldungen: Der Knopf im Formular führt jetzt zum Forum-Thread des Moduls statt zu GitHub.
+
 ## 0.1.0 (Build 1, 06.11.2026)
 
 - Erste Fassung: Wallbox über EEBUS als Kind des NRG-Stack EEBUS-Gateways (ab 0.5.3, Kind-Schnittstelle 1.2).

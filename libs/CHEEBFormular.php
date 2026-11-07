@@ -14,6 +14,9 @@ trait CHEEBFormular
 {
     // „Was ist neu": Schlüssel = Version ohne Beta-/Build-Suffix.
     private static $CHEEB_NEWS_VERSIONS = [
+        '0.1.1' => [
+            '• 💬 Feedback and questions now go to the forum thread for this module - the button in “Feedback” opens it.',
+        ],
         '0.1.0' => [
             '• First version: connects a wallbox via EEBUS to Symcon - vehicle detection, charging state, current per phase, power, charged energy and state of charge (if the vehicle reports it).',
             '• Charging current and charging release can be set by hand, by script or by an energy management (EEBUS use cases OPEV and, if offered, OSCEV).',
@@ -22,8 +25,8 @@ trait CHEEBFormular
     ];
 
     private static $CHEEB_REPO_URL     = 'https://github.com/DG65/NRGChargerEEBUSHub';
-    // Bis zum eigenen Forum-Thread: GitHub-Issues (danach Kurzform community.symcon.de/t/<ID> wie WPEEBUSHub).
-    private static $CHEEB_ISSUES_URL   = 'https://github.com/DG65/NRGChargerEEBUSHub/issues';
+    // Modul-Thread im Symcon-Forum (Kurzform mit Themen-ID, bleibt gültig, auch wenn der Titel geändert wird).
+    private static $CHEEB_FORUM_URL    = 'https://community.symcon.de/t/144878';
     private static $CHEEB_LICENSE_URL  = 'https://github.com/DG65/NRGChargerEEBUSHub/blob/main/LICENSE';
     private static $CHEEB_PAYPAL_URL   = 'https://paypal.me/DietmarGureth';
     private static $CHEEB_LIBRARY_GUID = '{4405F7A1-3518-498C-9ECB-3A04587B5D35}';
@@ -176,7 +179,7 @@ trait CHEEBFormular
             'caption' => '💬  Feedback',
             'items' => [
                 ['type' => 'Label', 'caption' => '🧪 This module is new and so far only tested against a simulated wallbox. Which wallbox did you connect, and did it work? Feedback with manufacturer, model, vehicle and the use cases shown helps a lot.'],
-                ['type' => 'Button', 'caption' => 'Report a problem on GitHub', 'onClick' => "echo '" . self::$CHEEB_ISSUES_URL . "';", 'link' => true],
+                ['type' => 'Button', 'caption' => 'Open the forum thread', 'onClick' => "echo '" . self::$CHEEB_FORUM_URL . "';", 'link' => true],
                 ['type' => 'Button', 'caption' => 'Got it – don\'t show again', 'onClick' => 'CHEEB_AckForumHint($id);'],
             ],
         ];
