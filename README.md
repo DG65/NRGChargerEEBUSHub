@@ -1,7 +1,7 @@
 # NRG-Stack ChargerEEBUSHub
 
 [![Symcon](https://img.shields.io/badge/Symcon-PHPModul-red.svg)](https://www.symcon.de/service/dokumentation/entwicklerbereich/sdk-tools/sdk-php/)
-[![Modul Version](https://img.shields.io/badge/Modul%20Version-0.1.1-blue.svg)](library.json)
+[![Modul Version](https://img.shields.io/badge/Modul%20Version-0.2.0-blue.svg)](library.json)
 [![Symcon Version](https://img.shields.io/badge/Symcon%20Version-9.0%2B-green.svg)](https://www.symcon.de)
 [![License](https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-lightgrey.svg)](LICENSE)
 [![PayPal](https://img.shields.io/badge/PayPal-Spenden-blue.svg)](https://paypal.me/DietmarGureth)
@@ -52,6 +52,16 @@ muss das eigene PV-Überschussladen ausgeschaltet sein, damit sie dem Energieman
 | `SitzungEnergie`, `Energie` | geladene Energie dieser Sitzung bzw. gesamt in kWh |
 | `Ladestand` | Ladestand des Fahrzeugs in % (wenn gemeldet) |
 | `Kommunikation`, `Fahrzeugkennung` | IEC 61851 oder ISO 15118, Kennung des Fahrzeugs |
+
+## Ladeeinstellungen (wie evcc)
+
+- **Strombereich:** Lädt das Fahrzeug über ISO 15118-2, gilt der Bereich, den es selbst meldet. Bei IEC 61851
+  meldet die Wallbox nur pauschal 6/16 A, dann gilt der eingestellte Mindest- und Höchststrom.
+- **Nur ganze Ampere:** für Wallboxen, die intern auf ganze Ampere runden (Elli Charger Connect/Pro der ersten
+  Generation); der Strom wird abgerundet.
+- **Gemeldete Ladeenergie ignorieren:** für Wallboxen mit unzuverlässigem Energiewert (Elli Charger Pro).
+- „Lädt“ gilt erst über dem 0,6-Fachen der Mindestleistung; Pausieren mit 0 A wird erst gesendet, wenn das
+  Fahrzeug seinen Kommunikationsstandard gemeldet hat.
 
 ## Funktionen
 

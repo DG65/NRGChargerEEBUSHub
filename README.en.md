@@ -1,7 +1,7 @@
 # NRG-Stack ChargerEEBUSHub
 
 [![Symcon](https://img.shields.io/badge/Symcon-PHP%20module-red.svg)](https://www.symcon.de/service/dokumentation/entwicklerbereich/sdk-tools/sdk-php/)
-[![Module version](https://img.shields.io/badge/Module%20version-0.1.1-blue.svg)](library.json)
+[![Module version](https://img.shields.io/badge/Module%20version-0.2.0-blue.svg)](library.json)
 [![Symcon version](https://img.shields.io/badge/Symcon%20version-9.0%2B-green.svg)](https://www.symcon.de)
 [![License](https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-lightgrey.svg)](LICENSE)
 [![PayPal](https://img.shields.io/badge/PayPal-Donate-blue.svg)](https://paypal.me/DietmarGureth)
@@ -52,6 +52,16 @@ own PV surplus charging switched off so that they follow the energy management.
 | `SitzungEnergie`, `Energie` | energy charged in this session / in total in kWh |
 | `Ladestand` | vehicle state of charge in % (if reported) |
 | `Kommunikation`, `Fahrzeugkennung` | IEC 61851 or ISO 15118, vehicle identification |
+
+## Charging settings (like evcc)
+
+- **Current range:** if the vehicle charges via ISO 15118-2, the range it reports applies. With IEC 61851 the
+  wallbox only reports a general 6/16 A; then the configured minimum and maximum current apply.
+- **Only whole amperes:** for wallboxes rounding to whole amperes internally (Elli Charger Connect/Pro of the
+  first generation); the current is rounded down.
+- **Ignore reported charged energy:** for wallboxes with an unreliable energy value (Elli Charger Pro).
+- “Charging” only above 0.6 × the minimum power; pausing with 0 A is only sent once the vehicle has
+  reported its communication standard.
 
 ## Functions
 

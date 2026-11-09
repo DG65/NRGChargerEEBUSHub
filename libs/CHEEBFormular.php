@@ -14,6 +14,12 @@ trait CHEEBFormular
 {
     // „Was ist neu": Schlüssel = Version ohne Beta-/Build-Suffix.
     private static $CHEEB_NEWS_VERSIONS = [
+        '0.2.0' => [
+            '• ⚙️ Like evcc: the vehicle’s current range is only taken over for ISO 15118; with IEC 61851 the range from the new “Charging settings” applies (wallboxes report a general 6/16 A there).',
+            '• ⚡ Like evcc: “Charging” only above 0.6 × the minimum power; the vehicle identification survives a short empty report and is cleared when unplugged.',
+            '• 🛠️ Options for known wallbox faults: only whole amperes (Elli Gen1), ignore the reported charged energy (Elli Charger Pro).',
+            '• 🔗 Power, currents and energy use the shared NRG-Stack profiles like ChargerHub; the session energy has its own profile so that MeterHub does not mistake it for a meter.',
+        ],
         '0.1.1' => [
             '• 💬 Feedback and questions now go to the forum thread for this module - the button in “Feedback” opens it.',
         ],

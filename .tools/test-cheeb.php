@@ -77,6 +77,9 @@ $GLOBALS['PROFILE'] = [];
 function IPS_VariableProfileExists(string $n): bool { return isset($GLOBALS['PROFILE'][$n]); }
 function IPS_CreateVariableProfile(string $n, int $t): bool { $GLOBALS['PROFILE'][$n] = []; return true; }
 function IPS_SetVariableProfileAssociation(string $n, $w, string $text, string $icon, int $farbe): bool { $GLOBALS['PROFILE'][$n][$w] = $text; return true; }
+function IPS_SetVariableProfileDigits(string $n, int $d): bool { $GLOBALS['PROFILE'][$n]['_stellen'] = $d; return true; }
+function IPS_SetVariableProfileText(string $n, string $pre, string $suf): bool { $GLOBALS['PROFILE'][$n]['_suffix'] = $suf; return true; }
+function IPS_SetVariableProfileIcon(string $n, string $i): bool { return true; }
 
 class IPSModule
 {
@@ -101,6 +104,7 @@ class IPSModule
     protected function RegisterPropertyString($n, $v) { $this->props[$n] = $v; }
     protected function RegisterPropertyInteger($n, $v) { $this->props[$n] = $v; }
     protected function RegisterPropertyBoolean($n, $v) { $this->props[$n] = $v; }
+    protected function RegisterPropertyFloat($n, $v) { $this->props[$n] = $v; }
     protected function RegisterAttributeString($n, $v) { $this->attrs[$n] = $v; }
     protected function RegisterAttributeInteger($n, $v) { $this->attrs[$n] = $v; }
     protected function RegisterAttributeBoolean($n, $v) { $this->attrs[$n] = $v; }
@@ -108,6 +112,7 @@ class IPSModule
     protected function ReadPropertyString($n) { return $this->props[$n]; }
     protected function ReadPropertyInteger($n) { return $this->props[$n]; }
     protected function ReadPropertyBoolean($n) { return $this->props[$n]; }
+    protected function ReadPropertyFloat($n) { return (float)$this->props[$n]; }
     protected function ReadAttributeString($n) { return $this->attrs[$n]; }
     protected function ReadAttributeInteger($n) { return $this->attrs[$n]; }
     protected function ReadAttributeBoolean($n) { return $this->attrs[$n]; }
@@ -283,7 +288,8 @@ foreach ([0, 1, 2] as $i) {
 }
 $sende(['Event' => 'data', 'entity' => [1, 1], 'function' => 'loadControlLimitDescriptionListData', 'data' => ['loadControlLimitDescriptionData' => $ld]]);
 $st = json_decode($wb->GetState(), true);
-pruefe($st["opev"] === true && $st['oscev'] === true && $st['currentRange'] == [6, 32], 'Pflicht- und Empfehlungsgrenzen je Phase erkannt, erlaubt 6–32 A');
+pruefe($st["opev"] === true && $st['oscev'] === true && $st['currentRange'] == [6, 16] && $st['currentRangeFrom'] === 'instance',
+    'Grenzen je Phase erkannt; Kommunikation noch nicht ISO: Strombereich der Instanz 6–16 A statt der Gerätewerte (evcc #14418)');
 pruefe(json_decode($wb->attrs['Geraet'], true)['angewendet'] === true, 'Nach dem Anstecken Strom einmal gesetzt (Gateway ohne Verbindung lehnt ab)');
 pruefe($wb->SetChargeEnable(false) === false && $wb->attrs['PauseAusstehend'] === true && strpos(end($wb->log), 'Kommunikationsstandard') !== false,
     'Pausieren ohne bekannten Kommunikationsstandard aufgeschoben (evcc-Regel)');
@@ -291,6 +297,28 @@ $sende(['Event' => 'data', 'entity' => [1, 1], 'function' => 'deviceDiagnosisSta
 pruefe($wb->vars['Zustand'] === 2, 'Fahrzeug standby: Zustand pausiert');
 $sende(['Event' => 'data', 'entity' => [1, 1], 'function' => 'deviceConfigurationKeyValueListData', 'data' => ['deviceConfigurationKeyValueData' => [['keyId' => 0, 'value' => ['string' => 'iso15118-2ed1']]]]]);
 pruefe($wb->vars['Kommunikation'] === 'iso15118-2ed1', 'Kommunikationsstandard ISO 15118 übernommen');
+$st = json_decode($wb->GetState(), true);
+pruefe($st['currentRange'] == [6, 32] && $st['currentRangeFrom'] === 'vehicle', 'ISO 15118-2: Strombereich des Fahrzeugs 6–32 A');
+// Laden erlaubt (evcc Enabled): inaktive Grenze oder ≥ 1 A; ISO-Pause 0,1 A gilt als pausiert.
+$grenzen = function (bool $aktiv, float $a) use ($sende) {
+    $l = [];
+    for ($i = 0; $i < 3; $i++) {
+        $l[] = ['limitId' => $i, 'isLimitActive' => $aktiv, 'isLimitChangeable' => true, 'value' => ['number' => (int)round($a * 10), 'scale' => -1]];
+    }
+    $sende(['Event' => 'data', 'entity' => [1, 1], 'function' => 'loadControlLimitListData', 'data' => ['loadControlLimitData' => $l]]);
+};
+$grenzen(true, 0.1);
+$a = json_decode($wb->GetState(), true)['chargingAllowed'];
+$grenzen(true, 10.0);
+$b = json_decode($wb->GetState(), true)['chargingAllowed'];
+$grenzen(false, 32.0);
+pruefe($a === false && $b === true && json_decode($wb->GetState(), true)['chargingAllowed'] === true, 'Laden erlaubt wie evcc: 0,1 A = Pause, 10 A = frei, inaktive Grenze = frei');
+// Fahrzeugkennung: eine leere Meldung löscht die zuletzt gelesene nicht (Porsche PMCC meldet sie nur kurz).
+$sende(['Event' => 'data', 'entity' => [1, 1], 'function' => 'identificationListData', 'data' => ['identificationData' => [['identificationId' => 0, 'identificationValue' => 'AA:BB']]]]);
+$sende(['Event' => 'data', 'entity' => [1, 1], 'function' => 'identificationListData', 'data' => ['identificationData' => []]]);
+pruefe($wb->vars['Fahrzeugkennung'] === 'AA:BB', 'Fahrzeugkennung bleibt nach leerer Meldung erhalten');
+pruefe(($GLOBALS['PROFILE']['NRG.Ampere']['_suffix'] ?? '') === ' A' && ($GLOBALS['PROFILE']['CHEEB.kWhSession']['_suffix'] ?? '') === ' kWh (Sitzung)',
+    'Profile wie ChargerHub: NRG.Ampere, Sitzungsenergie mit eigenem Suffix (keine Zählerverwechslung in MeterHub)');
 
 $f = $wb->GetFunctions()[0];
 pruefe($f['function'] === 'charger' && $f['contractVersion'] === '1.12' && $f['currentLimitID'] === $wb->ids['Ladestrom'] && $f['chargeEnableID'] === $wb->ids['Ladefreigabe']
@@ -373,10 +401,13 @@ if ($lv !== false) {
                 $phase = 'anstecken';
             } elseif ($phase === 'anstecken' && $v['Angesteckt'] === true && $v['Kommunikation'] === 'iec61851' && $v['Leistung'] == 11040.0) {
                 pruefe(true, 'Fahrzeug später angesteckt (Discovery-Meldung): IEC 61851, lädt mit 16 A = ' . $v['Leistung'] . ' W, Ladestand ' . $v['Ladestand'] . ' %');
-                pruefe($wb2->SetChargeCurrent(10) === true, 'CHEEB_SetChargeCurrent(10)');
+                $kennungLive = (string)$v['Fahrzeugkennung'];
+                // Nur ganze Ampere (Elli Gen1): 10,7 A wird auf 10 A abgerundet.
+                $wb2->props['GanzeAmpere'] = true;
+                pruefe($wb2->SetChargeCurrent(10.7) === true, 'CHEEB_SetChargeCurrent(10,7) mit „nur ganze Ampere“');
                 $phase = 'strom';
             } elseif ($phase === 'strom' && $v['StromL1'] == 10.0 && $v['Leistung'] == 6900.0) {
-                pruefe(true, 'Fahrzeug folgt: 10 A je Phase, 6900 W');
+                pruefe(true, 'Fahrzeug folgt: 10 A je Phase (10,7 A abgerundet), 6900 W');
                 pruefe($wb2->SetChargeEnable(false) === true, 'CHEEB_SetChargeEnable(false)');
                 $phase = 'pause';
             } elseif ($phase === 'pause' && $v['Leistung'] == 0.0 && $v['Zustand'] === 2 && $v['Laedt'] === false) {
@@ -392,7 +423,8 @@ if ($lv !== false) {
             }
         }
         pruefe($phase === 'fertig', 'Ablauf vollständig (Stand: ' . $phase . ')');
-        pruefe((float)$wb2->vars['Energie'] > 0 && (string)$wb2->vars['Fahrzeugkennung'] === '0a:1b:2c:3d:4e:5f', 'Energie ' . $wb2->vars['Energie'] . ' kWh, Fahrzeugkennung gelesen');
+        pruefe((float)$wb2->vars['Energie'] > 0 && ($kennungLive ?? '') === '0a:1b:2c:3d:4e:5f' && $wb2->vars['Fahrzeugkennung'] === '',
+            'Energie ' . $wb2->vars['Energie'] . ' kWh, Fahrzeugkennung gelesen und nach dem Abstecken geleert');
         $simLog = (string)file_get_contents($log);
         pruefe(strpos($simLog, 'SIM current 10 A') !== false && strpos($simLog, 'SIM current 0 A state standby') !== false && strpos($simLog, 'SIM ev unplugged') !== false,
             'Simulator: 10 A, Pause (standby), abgesteckt');

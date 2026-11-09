@@ -31,14 +31,27 @@ class ChargerEEBUSHub extends IPSModule
     private const DATA_ZUM_GATEWAY = '{26D4DA14-6C0D-4686-AE00-D23234BAD90D}';
     private const CONTRACT_VERSION = '1.12';
     private const PHASEN = ['a', 'b', 'c'];
-    // Unter dieser Leistung gilt „lädt nicht“ (wie ChargerHub chargingStateID).
-    private const LAEDT_AB_W = 100;
+    // „Lädt“ erst über dem 0,6-Fachen der Mindestleistung (evcc idleFactor, Mindeststrom × 230 V).
+    private const LAEDT_FAKTOR = 0.6;
+    // Kommunikationsstandards, bei denen das Fahrzeug seinen Strombereich wirklich meldet (evcc #14418).
+    private const ISO_STANDARDS = ['iso15118-2ed1', 'iso15118-2ed2'];
+    // Ohne neue Strommessung so lange nach einer Grenzänderung gelten die Ströme als veraltet (evcc).
+    private const STROM_VERALTET_S = 15;
     private const ZUSTAENDE = ['none' => 0, 'active' => 1, 'paused' => 2, 'finished' => 3, 'error' => 4];
 
     public function Create()
     {
         parent::Create();
         $this->RegisterPropertyString('FormLayout', '[]');
+        // Strombereich der Wallbox, wenn das Fahrzeug nach IEC 61851 lädt: Die Wallbox meldet dann pauschal 6/16 A,
+        // die nichts über den Anschluss aussagen (evcc: Ladepunkt-Einstellung statt Gerätewert). Bei ISO 15118
+        // gilt der Bereich, den das Fahrzeug meldet.
+        $this->RegisterPropertyFloat('MinStrom', 6.0);
+        $this->RegisterPropertyFloat('MaxStrom', 16.0);
+        // Gerätefehler umgehen wie evcc: nur ganze Ampere (Elli Charger Connect/Pro der ersten Generation),
+        // gemeldete Ladeenergie ignorieren (Elli Charger Pro).
+        $this->RegisterPropertyBoolean('GanzeAmpere', false);
+        $this->RegisterPropertyBoolean('LadeenergieIgnorieren', false);
         // Stand der Wallbox und des Fahrzeugs (Entitäten, Kennungen, Grenzen) zwischen zwei Meldungen.
         $this->RegisterAttributeString('Geraet', '{}');
         $this->RegisterAttributeInteger('LastSeenAt', 0);
@@ -64,13 +77,13 @@ class ChargerEEBUSHub extends IPSModule
         $this->MaintainVariable('Zustand', $this->t('Charging state'), VARIABLETYPE_INTEGER, 'CHEEB.State', 3, true);
         $this->MaintainVariable('Laedt', $this->t('Charging'), VARIABLETYPE_BOOLEAN, '', 4, true);
         $this->MaintainVariable('Ladefreigabe', $this->t('Charging release'), VARIABLETYPE_BOOLEAN, '~Switch', 5, true);
-        $this->MaintainVariable('Ladestrom', $this->t('Charging current'), VARIABLETYPE_FLOAT, '~Ampere', 6, true);
-        $this->MaintainVariable('Leistung', $this->t('Charging power'), VARIABLETYPE_FLOAT, '~Watt', 7, true);
-        $this->MaintainVariable('StromL1', $this->t('Current L1'), VARIABLETYPE_FLOAT, '~Ampere', 8, true);
-        $this->MaintainVariable('StromL2', $this->t('Current L2'), VARIABLETYPE_FLOAT, '~Ampere', 9, true);
-        $this->MaintainVariable('StromL3', $this->t('Current L3'), VARIABLETYPE_FLOAT, '~Ampere', 10, true);
-        $this->MaintainVariable('SitzungEnergie', $this->t('Energy of this charging session'), VARIABLETYPE_FLOAT, '~Electricity', 11, true);
-        $this->MaintainVariable('Energie', $this->t('Energy charged in total'), VARIABLETYPE_FLOAT, '~Electricity', 12, true);
+        $this->MaintainVariable('Ladestrom', $this->t('Charging current'), VARIABLETYPE_FLOAT, 'NRG.Ampere', 6, true);
+        $this->MaintainVariable('Leistung', $this->t('Charging power'), VARIABLETYPE_FLOAT, 'NRG.Watt', 7, true);
+        $this->MaintainVariable('StromL1', $this->t('Current L1'), VARIABLETYPE_FLOAT, 'NRG.Ampere', 8, true);
+        $this->MaintainVariable('StromL2', $this->t('Current L2'), VARIABLETYPE_FLOAT, 'NRG.Ampere', 9, true);
+        $this->MaintainVariable('StromL3', $this->t('Current L3'), VARIABLETYPE_FLOAT, 'NRG.Ampere', 10, true);
+        $this->MaintainVariable('SitzungEnergie', $this->t('Energy of this charging session'), VARIABLETYPE_FLOAT, 'CHEEB.kWhSession', 11, true);
+        $this->MaintainVariable('Energie', $this->t('Energy charged in total'), VARIABLETYPE_FLOAT, 'NRG.kWh', 12, true);
         $this->MaintainVariable('Ladestand', $this->t('Vehicle state of charge'), VARIABLETYPE_INTEGER, '~Battery.100', 13, true);
         $this->MaintainVariable('Kommunikation', $this->t('Vehicle communication'), VARIABLETYPE_STRING, '', 14, true);
         $this->MaintainVariable('Fahrzeugkennung', $this->t('Vehicle identification'), VARIABLETYPE_STRING, '', 15, true);
@@ -104,6 +117,18 @@ class ChargerEEBUSHub extends IPSModule
     /** Profil für den Ladezustand; Namen in der Sprache, die Symcon beim Anlegen hat (wie WPModbusHub). */
     private function profileSicherstellen(): void
     {
+        // Gemeinsame NRG-Profile wie ChargerHub/MeterHub (nur anlegen, falls sie fehlen). Die Sitzungsenergie
+        // bekommt ein eigenes Suffix, damit die MeterHub-Zählersuche sie nicht als Zähler aufnimmt - sie springt
+        // je Ladevorgang zurück (ChargerHub CHB.kWhSession).
+        foreach (['NRG.Watt' => [' W', 0, 'Electricity'], 'NRG.kWh' => [' kWh', 2, 'Electricity'], 'NRG.Ampere' => [' A', 1, 'Electricity'],
+            'CHEEB.kWhSession' => [$this->t(' kWh (session)'), 2, 'Electricity']] as $name => [$suffix, $stellen, $icon]) {
+            if (!IPS_VariableProfileExists($name)) {
+                IPS_CreateVariableProfile($name, VARIABLETYPE_FLOAT);
+                IPS_SetVariableProfileDigits($name, $stellen);
+                IPS_SetVariableProfileText($name, '', $suffix);
+                IPS_SetVariableProfileIcon($name, $icon);
+            }
+        }
         if (IPS_VariableProfileExists('CHEEB.State')) {
             return;
         }
@@ -303,6 +328,7 @@ class ChargerEEBUSHub extends IPSModule
             $this->wertSetzen($v, 0.0);
         }
         $this->wertSetzen('Kommunikation', '');
+        $this->wertSetzen('Fahrzeugkennung', '');
     }
 
     private static function zahl($v): ?float
@@ -357,7 +383,10 @@ class ChargerEEBUSHub extends IPSModule
                     $werte = array_filter(array_map(function ($i) {
                         return (string)($i['identificationValue'] ?? '');
                     }, (array)($d['identificationData'] ?? [])));
-                    $this->wertSetzen('Fahrzeugkennung', implode(', ', $werte));
+                    // Leere Liste nicht übernehmen: manche Wallboxen (Porsche PMCC) melden die Kennung nur kurz (evcc).
+                    if ($werte !== []) {
+                        $this->wertSetzen('Fahrzeugkennung', implode(', ', $werte));
+                    }
                 }
                 break;
             case 'electricalConnectionParameterDescriptionListData':
@@ -469,6 +498,9 @@ class ChargerEEBUSHub extends IPSModule
                     }
                     break;
                 case 'charge':
+                    if ($this->ReadPropertyBoolean('LadeenergieIgnorieren')) {
+                        break;
+                    }
                     $kwh = strtolower($desc['unit']) === 'kwh' ? $w : $w / 1000;
                     $this->sitzungsEnergie($kwh);
                     break;
@@ -479,6 +511,12 @@ class ChargerEEBUSHub extends IPSModule
         }
         foreach ($strom as $i => $a) {
             $this->wertSetzen('StromL' . ($i + 1), $a);
+        }
+        if ($strom !== [] && !empty($g['grenzeSeit'])) {
+            // Neue Strommessung bestätigt die letzte Grenzänderung (evcc DataUpdateCurrentPerPhase).
+            $g = $this->geraet();
+            unset($g['grenzeSeit']);
+            $this->geraetSchreiben($g);
         }
         if ($leistung === null && $leistungPhasen > 0) {
             $leistung = $leistungPhasen;
@@ -514,7 +552,9 @@ class ChargerEEBUSHub extends IPSModule
         $state = $an ? (string)($g['state'] ?? 'active') : 'none';
         $this->wertSetzen('Zustand', self::ZUSTAENDE[$state] ?? 1);
         $p = @$this->GetValue('Leistung');
-        $this->wertSetzen('Laedt', $an && $state === 'active' && is_numeric($p) && (float)$p > self::LAEDT_AB_W);
+        // Wie evcc: lädt, wenn die Leistung über dem 0,6-Fachen der Mindestleistung einer Phase liegt.
+        [$min] = $an ? $this->stromBereich() : [6.0];
+        $this->wertSetzen('Laedt', $an && $state === 'active' && is_numeric($p) && (float)$p > self::LAEDT_FAKTOR * $min * 230);
     }
 
     private function wertSetzen(string $ident, $wert): void
@@ -552,21 +592,32 @@ class ChargerEEBUSHub extends IPSModule
         return $out;
     }
 
-    /** Mindest- und Höchststrom laut Fahrzeug/Wallbox (erlaubte Werte der Pflichtgrenzen), sonst 6/16 A. */
+    /** Lädt das Fahrzeug nach ISO 15118-2 (meldet dann seinen echten Strombereich)? */
+    private function istIso(): bool
+    {
+        return in_array(strtolower((string)($this->geraet()['kom'] ?? '')), self::ISO_STANDARDS, true);
+    }
+
+    /**
+     * Mindest- und Höchststrom: bei ISO 15118-2 der vom Fahrzeug gemeldete Bereich (erlaubte Werte der
+     * Pflichtgrenzen), sonst die Einstellung der Instanz - IEC-Wallboxen melden pauschal 6/16 A (evcc #14418).
+     */
     private function stromBereich(): array
     {
         $min = null;
         $max = null;
-        foreach ($this->phasenGrenzen('obligation', 'overloadProtection') as $p) {
-            if ($p['min'] !== null) {
-                $min = $min === null ? $p['min'] : max($min, $p['min']);
-            }
-            if ($p['max'] !== null) {
-                $max = $max === null ? $p['max'] : min($max, $p['max']);
+        if ($this->istIso()) {
+            foreach ($this->phasenGrenzen('obligation', 'overloadProtection') as $p) {
+                if ($p['min'] !== null) {
+                    $min = $min === null ? $p['min'] : max($min, $p['min']);
+                }
+                if ($p['max'] !== null) {
+                    $max = $max === null ? $p['max'] : min($max, $p['max']);
+                }
             }
         }
         // Werte kommen aus dem JSON-Attribut, ganze Zahlen dort als int: als float zurückgeben.
-        return [(float)($min ?? 6.0), (float)($max ?? 16.0)];
+        return [(float)($min ?? $this->ReadPropertyFloat('MinStrom')), (float)($max ?? $this->ReadPropertyFloat('MaxStrom'))];
     }
 
     /**
@@ -598,6 +649,10 @@ class ChargerEEBUSHub extends IPSModule
         $this->WriteAttributeBoolean('PauseAusstehend', false);
         [$min, $max] = $this->stromBereich();
         $soll = $frei ? max($min, min($max, $this->ReadAttributeFloat('SollStrom'))) : 0.0;
+        if ($this->ReadPropertyBoolean('GanzeAmpere')) {
+            // Abrunden, damit die Wallbox den Wert nicht selbst über die Vorgabe hinaus rundet.
+            $soll = floor($soll);
+        }
         $eintraege = [];
         foreach ($pflicht as $p) {
             if (!$p['aenderbar']) {
@@ -643,7 +698,30 @@ class ChargerEEBUSHub extends IPSModule
             return false;
         }
         $this->SendDebug('OPEV/OSCEV', 'write ' . json_encode($eintraege), 0);
+        $g = $this->geraet();
+        $g['grenzeSeit'] = time();
+        $this->geraetSchreiben($g);
         return true;
+    }
+
+    /** Erlaubt die Wallbox laut ihren gemeldeten Pflichtgrenzen gerade zu laden? null ohne Fahrzeug/Grenzen. */
+    private function ladenErlaubt(): ?bool
+    {
+        $g = $this->geraet();
+        $pflicht = $this->phasenGrenzen('obligation', 'overloadProtection');
+        if (empty($g['ev']) || $pflicht === []) {
+            return null;
+        }
+        foreach ($pflicht as $p) {
+            $l = $g['grenzen'][(string)$p['limitId']] ?? null;
+            if ($l === null) {
+                continue;
+            }
+            if (!$l['aktiv'] || (float)($l['wert'] ?? 0) >= 1.0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** CHEEB_SetChargeCurrent($id, $Ampere): bool — gewünschten Ladestrom je Phase setzen (wirkt sofort bzw. beim Anstecken). */
@@ -754,6 +832,12 @@ class ChargerEEBUSHub extends IPSModule
             'opev' => $this->phasenGrenzen('obligation', 'overloadProtection') !== [],
             'oscev' => $this->phasenGrenzen('recommendation', 'selfConsumption') !== [],
             'currentRange' => $this->stromBereich(),
+            'currentRangeFrom' => $this->istIso() ? 'vehicle' : 'instance',
+            // Wie evcc Enabled(): Laden erlaubt, wenn eine Grenze inaktiv ist oder mindestens 1 A zulässt
+            // (Pause ist bei IEC 0 A, bei ISO 0,1 A).
+            'chargingAllowed' => $this->ladenErlaubt(),
+            // Wie evcc: nach einer Grenzänderung ohne neue Strommessung binnen 15 s gelten die Ströme als veraltet.
+            'currentsStale' => !empty($g['grenzeSeit']) && time() - (int)$g['grenzeSeit'] > self::STROM_VERALTET_S,
             'setCurrent' => $this->ReadAttributeFloat('SollStrom'),
             'setEnable' => $this->ReadAttributeBoolean('SollFrei'),
             'pausePending' => $this->ReadAttributeBoolean('PauseAusstehend'),
@@ -823,6 +907,17 @@ class ChargerEEBUSHub extends IPSModule
                 $ergZeile !== '' ? ['type' => 'Label', 'caption' => $ergZeile] : null,
             ])),
         ];
-        return ['verbindung' => $verbindung, 'laden' => $laden];
+        // Einstellungen nach evcc: Strombereich bei IEC 61851 und Behelfe für bekannte Gerätefehler.
+        $einstellungen = [
+            'type' => 'ExpansionPanel', 'expanded' => false, 'caption' => '⚙️  Charging settings',
+            'items' => [
+                ['type' => 'Label', 'caption' => 'Vehicles charging via ISO 15118 report their current range themselves. With IEC 61851 the wallbox only reports a general 6/16 A, so the range set here applies.'],
+                ['type' => 'NumberSpinner', 'name' => 'MinStrom', 'caption' => 'Minimum charging current (IEC 61851)', 'suffix' => 'A', 'minimum' => 0, 'maximum' => 63, 'digits' => 1],
+                ['type' => 'NumberSpinner', 'name' => 'MaxStrom', 'caption' => 'Maximum charging current (IEC 61851)', 'suffix' => 'A', 'minimum' => 0, 'maximum' => 63, 'digits' => 1],
+                ['type' => 'CheckBox', 'name' => 'GanzeAmpere', 'caption' => 'Only whole amperes (e.g. Elli Charger Connect/Pro of the first generation)'],
+                ['type' => 'CheckBox', 'name' => 'LadeenergieIgnorieren', 'caption' => 'Ignore the charged energy reported by the wallbox (e.g. Elli Charger Pro)'],
+            ],
+        ];
+        return ['verbindung' => $verbindung, 'einstellungen' => $einstellungen, 'laden' => $laden];
     }
 }

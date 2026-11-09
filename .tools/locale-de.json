@@ -93,5 +93,16 @@
     "🙈 Hidden": "🙈 Ausgeblendet",
     "Position": "Position",
     "↩️ Reset to default": "↩️ Auf Standard zurücksetzen",
-    "Set to default. Click “Apply” below to save.": "Auf Standard gesetzt. Zum Speichern unten „Übernehmen“ klicken."
+    "Set to default. Click “Apply” below to save.": "Auf Standard gesetzt. Zum Speichern unten „Übernehmen“ klicken.",
+    "⚙️  Charging settings": "⚙️  Ladeeinstellungen",
+    "Vehicles charging via ISO 15118 report their current range themselves. With IEC 61851 the wallbox only reports a general 6/16 A, so the range set here applies.": "Fahrzeuge, die über ISO 15118 laden, melden ihren Strombereich selbst. Bei IEC 61851 meldet die Wallbox nur pauschal 6/16 A, deshalb gilt dann der hier eingestellte Bereich.",
+    "Minimum charging current (IEC 61851)": "Mindest-Ladestrom (IEC 61851)",
+    "Maximum charging current (IEC 61851)": "Höchster Ladestrom (IEC 61851)",
+    "Only whole amperes (e.g. Elli Charger Connect/Pro of the first generation)": "Nur ganze Ampere (z. B. Elli Charger Connect/Pro der ersten Generation)",
+    "Ignore the charged energy reported by the wallbox (e.g. Elli Charger Pro)": "Von der Wallbox gemeldete Ladeenergie ignorieren (z. B. Elli Charger Pro)",
+    " kWh (session)": " kWh (Sitzung)",
+    "• ⚙️ Like evcc: the vehicle’s current range is only taken over for ISO 15118; with IEC 61851 the range from the new “Charging settings” applies (wallboxes report a general 6/16 A there).": "• ⚙️ Wie bei evcc: Den Strombereich des Fahrzeugs übernimmt das Modul nur bei ISO 15118; bei IEC 61851 gilt der Bereich aus den neuen „Ladeeinstellungen“ (Wallboxen melden dort pauschal 6/16 A).",
+    "• ⚡ Like evcc: “Charging” only above 0.6 × the minimum power; the vehicle identification survives a short empty report and is cleared when unplugged.": "• ⚡ Wie bei evcc: „Lädt“ erst über dem 0,6-Fachen der Mindestleistung; die Fahrzeugkennung übersteht eine kurze leere Meldung und wird beim Abstecken geleert.",
+    "• 🛠️ Options for known wallbox faults: only whole amperes (Elli Gen1), ignore the reported charged energy (Elli Charger Pro).": "• 🛠️ Optionen für bekannte Wallbox-Fehler: nur ganze Ampere (Elli der ersten Generation), gemeldete Ladeenergie ignorieren (Elli Charger Pro).",
+    "• 🔗 Power, currents and energy use the shared NRG-Stack profiles like ChargerHub; the session energy has its own profile so that MeterHub does not mistake it for a meter.": "• 🔗 Leistung, Ströme und Energie nutzen die gemeinsamen NRG-Stack-Profile wie ChargerHub; die Sitzungsenergie hat ein eigenes Profil, damit MeterHub sie nicht für einen Zähler hält."
 }
