@@ -29,6 +29,11 @@ Cupra), Porsche Mobile Charger Connect/Plus, WARP Charger, EVBox Livo, Mennekes 
 Elli Charger Connect/Pro der ersten Generation hat laut evcc viele EEBUS-Fehler. Bei manchen Wallboxen
 muss das eigene PV-Überschussladen ausgeschaltet sein, damit sie dem Energiemanagement folgen.
 
+> **Vaillant (z. B. sensoNET Charger):** Vermutlich gilt dasselbe wie bei den Vaillant-Wärmepumpen, die
+> denselben EEBUS-Baustein nutzen: Das Gateway auf „Das Gerät verbindet sich zum Gateway“ stellen (Gateway ab
+> 0.7.4). In der Gegenrichtung trennt eine Vaillant-Wärmepumpe die Verbindung jede Minute. Mit einer
+> Vaillant-Wallbox selbst noch nicht getestet.
+
 ## Einrichtung
 
 1. Instanz „NRG-Stack ChargerEEBUSHub“ anlegen und als übergeordnete Instanz ein EEBUS-Gateway wählen bzw.

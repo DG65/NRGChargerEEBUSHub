@@ -30,6 +30,11 @@ According to field reports (e.g. evcc), EEBUS is offered by e.g. Elli Charger 2 
 The first-generation Elli Charger Connect/Pro has many EEBUS bugs according to evcc. Some wallboxes need their
 own PV surplus charging switched off so that they follow the energy management.
 
+> **Vaillant (e.g. sensoNET Charger):** probably the same applies as for Vaillant heat pumps, which use the
+> same EEBUS component: set the gateway to “The device connects to the gateway” (gateway 0.7.4 or newer). In
+> the other direction a Vaillant heat pump closes the connection every minute. Not yet tested with a Vaillant
+> wallbox itself.
+
 ## Setup
 
 1. Create the instance “NRG-Stack ChargerEEBUSHub” and choose or create an EEBUS gateway as parent instance.
