@@ -329,8 +329,9 @@ pruefe($f['contractType'] === 'charger' && $f['function'] === 'charger' && $f['c
 pruefe(($wb->timers['Rueckfall'] ?? -1) === 0, 'Rückfall ab Werk aus: kein Timer');
 $wb->props['FailsafeSec'] = 10;
 $wb->ApplyChanges();
-pruefe($wb->timers['Rueckfall'] === 30000 && $wb->GetFunctions()[0]['failsafeSec'] === 30 && $wb->GetFunctions()[0]['failsafeMode'] === 'maxCurrent',
-    'Frist 10 s wird auf 30 s angehoben, Vertrag meldet failsafeSec 30 und maxCurrent');
+pruefe($wb->timers['Rueckfall'] === 30000 && $wb->GetFunctions()[0]['failsafeSec'] === 30 && $wb->GetFunctions()[0]['failsafeMode'] === 'deadman'
+    && $wb->GetFunctions()[0]['failsafeLimitA'] === 32.0,
+    'Frist 10 s wird auf 30 s angehoben, Vertrag meldet failsafeSec 30, deadman, failsafeLimitA 32 A');
 $wb->SetChargeCurrent(8);
 $wb->SetChargeEnable(true);
 $wb->Rueckfall();
@@ -345,7 +346,7 @@ $wb->props['FailsafeVerhalten'] = 1;
 $wb->ApplyChanges();
 $wb->RequestAction('Ladefreigabe', true);
 $wb->Rueckfall();
-pruefe($wb->attrs['SollFrei'] === false && $wb->vars['Ladefreigabe'] === false && $wb->GetFunctions()[0]['failsafeMode'] === 'pause'
+pruefe($wb->attrs['SollFrei'] === false && $wb->vars['Ladefreigabe'] === false && $wb->GetFunctions()[0]['failsafeLimitA'] === 0.0
     && $wb->GetFunctions()[0]['failsafeSec'] === 300, 'Verhalten „Pausieren“: Frist 300 s abgelaufen, Laden pausiert');
 $wb->props['FailsafeSec'] = 0;
 $wb->ApplyChanges();

@@ -3,11 +3,12 @@
 ## 0.3.0 (Build 4, 20.11.2026)
 
 - Fremdanbindung (SUITE.md „Fremdanbindung: Module anderer Autoren“): Vertrag `charger` 1.13 mit `contractType`
-  (additiv, `function` bleibt), `failsafeSec` und `failsafeMode` (`maxCurrent`/`pause`).
+  (additiv, `function` bleibt), `failsafeSec`, `failsafeMode` `deadman` und `failsafeLimitA` (Strom im sicheren
+  Zustand, 0 = Pause), SUITE.md 5a–5d; erneutes Schreiben desselben Werts verlängert nur die Frist.
 - Rückfall (Totmann): neue Eigenschaften `FailsafeSec` (0 = aus, Standard; mindestens 30 s) und
   `FailsafeVerhalten` (Höchststrom weiterladen oder pausieren). Kommt in dieser Zeit kein Steuerbefehl
   (`SetChargeCurrent`, `SetChargeEnable`, Variablen), setzt das Modul den sicheren Zustand und meldet das; der
-  nächste Befehl beendet ihn. `GetState` zeigt `failsafeSec`, `failsafeMode`, `failsafeActive`.
+  nächste Befehl beendet ihn. `GetState` zeigt `failsafeSec`, `failsafeState`, `failsafeActive`.
 - Hinweis: Die EEBUS-Failsafe-Werte gehören zu LPC/LPP, nicht zu OPEV; der Rückfall liegt deshalb im Modul.
 
 ## 0.2.0 (Build 3, 09.11.2026)

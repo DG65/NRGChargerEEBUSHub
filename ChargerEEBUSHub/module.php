@@ -894,8 +894,11 @@ class ChargerEEBUSHub extends IPSModule
             'errorCodeID'        => 0,
             'planInfoID'         => 0,
             // Fremdanbindung: ohne failsafeSec > 0 gibt ein Konsument das Schreiben nicht frei.
+            // SUITE.md 5a/5d: Totmann (Konsument schreibt binnen failsafeSec/2 nach; derselbe Wert verlängert nur
+            // die Frist, OPEV-Grenze erneut schreiben ist ohne Nebenwirkung), Strom im sicheren Zustand (0 = Pause).
             'failsafeSec'        => $this->failsafeSec(),
-            'failsafeMode'       => $this->failsafeModus(),
+            'failsafeMode'       => 'deadman',
+            'failsafeLimitA'     => $this->failsafeModus() === 'pause' ? 0.0 : max($max, $this->ReadPropertyFloat('MaxStrom')),
         ];
         if (!empty($g['ec']['phasen'])) {
             $fn['phases'] = (int)$g['ec']['phasen'] >= 3 ? 3 : 1;
@@ -927,7 +930,7 @@ class ChargerEEBUSHub extends IPSModule
             'setEnable' => $this->ReadAttributeBoolean('SollFrei'),
             'pausePending' => $this->ReadAttributeBoolean('PauseAusstehend'),
             'failsafeSec' => $this->failsafeSec(),
-            'failsafeMode' => $this->failsafeModus(),
+            'failsafeState' => $this->failsafeModus(),
             'failsafeActive' => $this->ReadAttributeBoolean('FailsafeAktiv'),
             'limits' => $g['grenzen'] ?? [],
             'powerW' => @$this->GetValue('Leistung'),

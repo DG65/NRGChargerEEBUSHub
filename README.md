@@ -79,7 +79,7 @@ muss das eigene PV-Überschussladen ausgeschaltet sein, damit sie dem Energieman
 |---|---|
 | `CHEEB_SetChargeCurrent(int $id, float $Ampere)` | bool: Ladestrom je Phase (wirkt sofort bzw. beim Anstecken) |
 | `CHEEB_SetChargeEnable(int $id, bool $Enable)` | bool: Laden freigeben oder pausieren |
-| `CHEEB_GetFunctions(int $id)` | Wallbox-Vertrag des NRG-Stack (`contractType` `charger`, Version 1.13, mit `failsafeSec`/`failsafeMode`) |
+| `CHEEB_GetFunctions(int $id)` | Wallbox-Vertrag des NRG-Stack (`contractType` `charger`, Version 1.13, mit `failsafeSec`, `failsafeMode` `deadman`, `failsafeLimitA`) |
 | `CHEEB_GetState(int $id)` | JSON: Zustand zur Diagnose |
 
 Steuerregeln nach evcc: Der Ladestrom wird als Pflichtgrenze je Phase geschickt (OPEV), bei vorhandener

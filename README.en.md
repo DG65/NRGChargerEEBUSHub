@@ -79,7 +79,7 @@ own PV surplus charging switched off so that they follow the energy management.
 |---|---|
 | `CHEEB_SetChargeCurrent(int $id, float $Ampere)` | bool: charging current per phase (effective now or on plug-in) |
 | `CHEEB_SetChargeEnable(int $id, bool $Enable)` | bool: allow or pause charging |
-| `CHEEB_GetFunctions(int $id)` | NRG-Stack wallbox contract (`contractType` `charger`, version 1.13, with `failsafeSec`/`failsafeMode`) |
+| `CHEEB_GetFunctions(int $id)` | NRG-Stack wallbox contract (`contractType` `charger`, version 1.13, with `failsafeSec`, `failsafeMode` `deadman`, `failsafeLimitA`) |
 | `CHEEB_GetState(int $id)` | JSON: state for diagnosis |
 
 Control rules as in evcc: the charging current is sent as an obligation limit per phase (OPEV), and as a
