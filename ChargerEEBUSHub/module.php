@@ -29,7 +29,10 @@ class ChargerEEBUSHub extends IPSModule
 
     private const GATEWAY_MODULE = '{32809AEC-3A90-455F-8FE4-188DF37D594F}';
     private const DATA_ZUM_GATEWAY = '{26D4DA14-6C0D-4686-AE00-D23234BAD90D}';
-    private const CONTRACT_VERSION = '1.12';
+    private const CONTRACT_VERSION = '1.13';
+    // Rückfall (Fremdanbindung, SUITE.md): kürzeste erlaubte Frist, damit ein Konsument mit failsafeSec/2 nachschreiben kann.
+    private const RUECKFALL_MIN_S = 30;
+    private const RUECKFALL_MODI = [0 => 'maxCurrent', 1 => 'pause'];
     private const PHASEN = ['a', 'b', 'c'];
     // „Lädt“ erst über dem 0,6-Fachen der Mindestleistung (evcc idleFactor, Mindeststrom × 230 V).
     private const LAEDT_FAKTOR = 0.6;
@@ -52,6 +55,11 @@ class ChargerEEBUSHub extends IPSModule
         // gemeldete Ladeenergie ignorieren (Elli Charger Pro).
         $this->RegisterPropertyBoolean('GanzeAmpere', false);
         $this->RegisterPropertyBoolean('LadeenergieIgnorieren', false);
+        // Rückfall (Totmann): Kommt so lange kein Steuerbefehl (SetChargeCurrent/SetChargeEnable/Variable),
+        // setzt das Modul selbst einen sicheren Zustand. 0 = aus. FailsafeVerhalten: 0 = weiterladen mit
+        // Höchststrom (wie ohne Energiemanagement), 1 = pausieren.
+        $this->RegisterPropertyInteger('FailsafeSec', 0);
+        $this->RegisterPropertyInteger('FailsafeVerhalten', 0);
         // Stand der Wallbox und des Fahrzeugs (Entitäten, Kennungen, Grenzen) zwischen zwei Meldungen.
         $this->RegisterAttributeString('Geraet', '{}');
         $this->RegisterAttributeInteger('LastSeenAt', 0);
@@ -60,8 +68,10 @@ class ChargerEEBUSHub extends IPSModule
         $this->RegisterAttributeFloat('SollStrom', 16.0);
         $this->RegisterAttributeBoolean('SollFrei', true);
         $this->RegisterAttributeBoolean('PauseAusstehend', false);
+        $this->RegisterAttributeBoolean('FailsafeAktiv', false);
         $this->registerFormAttributes();
         $this->RegisterTimer('Anmelden', 0, 'CHEEB_Anmelden($_IPS[\'TARGET\']);');
+        $this->RegisterTimer('Rueckfall', 0, 'CHEEB_Rueckfall($_IPS[\'TARGET\']);');
     }
 
     public function ApplyChanges()
@@ -97,6 +107,12 @@ class ChargerEEBUSHub extends IPSModule
         $this->RegisterMessage($this->InstanceID, FM_CONNECT);
         $this->RegisterMessage($this->InstanceID, FM_DISCONNECT);
         $this->SetTimerInterval('Anmelden', 60000);
+        // Nach einem Neustart oder geänderter Frist bekommt der Konsument die volle Frist; ohne Frist ist der
+        // Rückfall aus und ein gesetzter sicherer Zustand gilt als beendet.
+        if ($this->failsafeSec() === 0) {
+            $this->WriteAttributeBoolean('FailsafeAktiv', false);
+        }
+        $this->rueckfallStellen();
         $this->Anmelden();
     }
 
@@ -727,17 +743,83 @@ class ChargerEEBUSHub extends IPSModule
     /** CHEEB_SetChargeCurrent($id, $Ampere): bool — gewünschten Ladestrom je Phase setzen (wirkt sofort bzw. beim Anstecken). */
     public function SetChargeCurrent(float $Ampere): bool
     {
-        $this->WriteAttributeFloat('SollStrom', max(0.0, $Ampere));
-        $this->wertSetzen('Ladestrom', max(0.0, $Ampere));
+        $this->steuerbefehl();
+        $this->sollStrom($Ampere);
         return $this->anwenden(true);
     }
 
     /** CHEEB_SetChargeEnable($id, $Enable): bool — Laden freigeben oder pausieren. */
     public function SetChargeEnable(bool $Enable): bool
     {
-        $this->WriteAttributeBoolean('SollFrei', $Enable);
-        $this->wertSetzen('Ladefreigabe', $Enable);
+        $this->steuerbefehl();
+        $this->sollFrei($Enable);
         return $this->anwenden(true);
+    }
+
+    private function sollStrom(float $a): void
+    {
+        $this->WriteAttributeFloat('SollStrom', max(0.0, $a));
+        $this->wertSetzen('Ladestrom', max(0.0, $a));
+    }
+
+    private function sollFrei(bool $frei): void
+    {
+        $this->WriteAttributeBoolean('SollFrei', $frei);
+        $this->wertSetzen('Ladefreigabe', $frei);
+    }
+
+    // ------------------------------------------------------------------
+    // Rückfall (Totmann, SUITE.md „Fremdanbindung“ Punkt 5)
+    // ------------------------------------------------------------------
+
+    /** Frist in Sekunden, 0 = aus; kürzere Werte als RUECKFALL_MIN_S werden angehoben. */
+    private function failsafeSec(): int
+    {
+        $s = $this->ReadPropertyInteger('FailsafeSec');
+        return $s <= 0 ? 0 : max(self::RUECKFALL_MIN_S, $s);
+    }
+
+    private function failsafeModus(): string
+    {
+        return self::RUECKFALL_MODI[$this->ReadPropertyInteger('FailsafeVerhalten')] ?? 'maxCurrent';
+    }
+
+    /** Timer neu aufziehen; im sicheren Zustand läuft er nicht, bis der nächste Steuerbefehl kommt. */
+    private function rueckfallStellen(): void
+    {
+        $s = $this->failsafeSec();
+        $this->SetTimerInterval('Rueckfall', $s > 0 && !$this->ReadAttributeBoolean('FailsafeAktiv') ? $s * 1000 : 0);
+    }
+
+    /** Jeder Steuerbefehl von außen setzt die Frist zurück und beendet einen gesetzten sicheren Zustand. */
+    private function steuerbefehl(): void
+    {
+        if ($this->ReadAttributeBoolean('FailsafeAktiv')) {
+            $this->WriteAttributeBoolean('FailsafeAktiv', false);
+            $this->LogMessage($this->t('Control commands arrive again: the fallback has ended.'), KL_NOTIFY);
+        }
+        $this->rueckfallStellen();
+    }
+
+    /** CHEEB_Rueckfall($id) — Timer: Frist ohne Steuerbefehl abgelaufen, sicheren Zustand setzen. */
+    public function Rueckfall(): void
+    {
+        $this->SetTimerInterval('Rueckfall', 0);
+        if ($this->failsafeSec() === 0) {
+            return;
+        }
+        $this->WriteAttributeBoolean('FailsafeAktiv', true);
+        if ($this->failsafeModus() === 'pause') {
+            $this->sollFrei(false);
+            $text = $this->t('No control command for %s s: charging paused (fallback).', (string)$this->failsafeSec());
+        } else {
+            // Wie ohne Energiemanagement: freigeben mit dem höchsten erlaubten Strom.
+            $this->sollStrom(max($this->stromBereich()[1], $this->ReadPropertyFloat('MaxStrom')));
+            $this->sollFrei(true);
+            $text = $this->t('No control command for %s s: charging released with maximum current (fallback).', (string)$this->failsafeSec());
+        }
+        $this->LogMessage($text, KL_WARNING);
+        $this->anwenden(true);
     }
 
     public function RequestAction($Ident, $Value)
@@ -757,8 +839,7 @@ class ChargerEEBUSHub extends IPSModule
     /** Aktionsbereich: Strom und Freigabe aus dem Formular testen. */
     public function LadenTesten(float $Ampere, bool $Frei): string
     {
-        $this->WriteAttributeFloat('SollStrom', max(0.0, $Ampere));
-        $this->wertSetzen('Ladestrom', max(0.0, $Ampere));
+        $this->sollStrom($Ampere);
         return $this->SetChargeEnable($Frei)
             ? '✅ ' . $this->t('Sent to the wallbox. Its answer appears in the variables in a few seconds.')
             : '⛔ ' . $this->t('Could not be sent. Details are in the message log.');
@@ -768,7 +849,7 @@ class ChargerEEBUSHub extends IPSModule
     // Verbund-Vertrag (charger, feldgleich ChargerHub/OCPPHub)
     // ------------------------------------------------------------------
 
-    /** CHEEB_GetFunctions($id): array — Wallbox-Vertrag 1.12 wie CHUB_GetFunctions. */
+    /** CHEEB_GetFunctions($id): array — Wallbox-Vertrag 1.13 wie CHUB_GetFunctions (contractType, failsafeSec). */
     public function GetFunctions(): array
     {
         $id = function (string $ident): int {
@@ -778,6 +859,7 @@ class ChargerEEBUSHub extends IPSModule
         $g = $this->geraet();
         [$min, $max] = $this->stromBereich();
         $fn = [
+            'contractType'       => 'charger',
             'contractVersion'    => self::CONTRACT_VERSION,
             'function'           => 'charger',
             'label'              => IPS_GetName($this->InstanceID),
@@ -811,6 +893,9 @@ class ChargerEEBUSHub extends IPSModule
             'stateID'            => $id('Zustand'),
             'errorCodeID'        => 0,
             'planInfoID'         => 0,
+            // Fremdanbindung: ohne failsafeSec > 0 gibt ein Konsument das Schreiben nicht frei.
+            'failsafeSec'        => $this->failsafeSec(),
+            'failsafeMode'       => $this->failsafeModus(),
         ];
         if (!empty($g['ec']['phasen'])) {
             $fn['phases'] = (int)$g['ec']['phasen'] >= 3 ? 3 : 1;
@@ -841,6 +926,9 @@ class ChargerEEBUSHub extends IPSModule
             'setCurrent' => $this->ReadAttributeFloat('SollStrom'),
             'setEnable' => $this->ReadAttributeBoolean('SollFrei'),
             'pausePending' => $this->ReadAttributeBoolean('PauseAusstehend'),
+            'failsafeSec' => $this->failsafeSec(),
+            'failsafeMode' => $this->failsafeModus(),
+            'failsafeActive' => $this->ReadAttributeBoolean('FailsafeAktiv'),
             'limits' => $g['grenzen'] ?? [],
             'powerW' => @$this->GetValue('Leistung'),
             'lastResult' => json_decode($this->ReadAttributeString('LetztesErgebnis'), true),
@@ -916,6 +1004,15 @@ class ChargerEEBUSHub extends IPSModule
                 ['type' => 'NumberSpinner', 'name' => 'MaxStrom', 'caption' => 'Maximum charging current (IEC 61851)', 'suffix' => 'A', 'minimum' => 0, 'maximum' => 63, 'digits' => 1],
                 ['type' => 'CheckBox', 'name' => 'GanzeAmpere', 'caption' => 'Only whole amperes (e.g. Elli Charger Connect/Pro of the first generation)'],
                 ['type' => 'CheckBox', 'name' => 'LadeenergieIgnorieren', 'caption' => 'Ignore the charged energy reported by the wallbox (e.g. Elli Charger Pro)'],
+                ['type' => 'NumberSpinner', 'name' => 'FailsafeSec', 'caption' => 'Fallback without control command after', 'suffix' => 's', 'minimum' => 0, 'maximum' => 3600],
+                ['type' => 'Label', 'name' => 'FailsafeSecHint', 'caption' => 'Only for control by an energy management or script: if no new charging current or release arrives within this time, the module sets the state chosen below by itself. 0 = off, at least 30 s, recommended 300 s. Energy managements of other authors only get write access with a value above 0.'],
+                ['type' => 'Select', 'name' => 'FailsafeVerhalten', 'caption' => 'State after the fallback', 'options' => [
+                    ['caption' => 'Keep charging with maximum current', 'value' => 0],
+                    ['caption' => 'Pause charging', 'value' => 1],
+                ]],
+                ['type' => 'Label', 'name' => 'FailsafeVerhaltenHint', 'caption' => $this->ReadAttributeBoolean('FailsafeAktiv')
+                    ? self::fest('⚠️ The fallback is active right now. The next control command ends it.')
+                    : self::fest('The next control command ends the fallback.')],
             ],
         ];
         return ['verbindung' => $verbindung, 'einstellungen' => $einstellungen, 'laden' => $laden];

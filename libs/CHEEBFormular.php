@@ -14,6 +14,10 @@ trait CHEEBFormular
 {
     // „Was ist neu": Schlüssel = Version ohne Beta-/Build-Suffix.
     private static $CHEEB_NEWS_VERSIONS = [
+        '0.3.0' => [
+            '• 🛟 New fallback for control by an energy management or script: if no control command arrives for the set time, the module keeps charging with maximum current or pauses, as chosen in “Charging settings” (off by default).',
+            '• 🔗 Wallbox contract 1.13: describes itself with its type and the fallback time, so that energy managements of other authors can find it as well.',
+        ],
         '0.2.0' => [
             '• ⚙️ Like evcc: the vehicle’s current range is only taken over for ISO 15118; with IEC 61851 the range from the new “Charging settings” applies (wallboxes report a general 6/16 A there).',
             '• ⚡ Like evcc: “Charging” only above 0.6 × the minimum power; the vehicle identification survives a short empty report and is cleared when unplugged.',

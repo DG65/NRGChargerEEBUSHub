@@ -321,9 +321,37 @@ pruefe(($GLOBALS['PROFILE']['NRG.Ampere']['_suffix'] ?? '') === ' A' && ($GLOBAL
     'Profile wie ChargerHub: NRG.Ampere, Sitzungsenergie mit eigenem Suffix (keine Zählerverwechslung in MeterHub)');
 
 $f = $wb->GetFunctions()[0];
-pruefe($f['function'] === 'charger' && $f['contractVersion'] === '1.12' && $f['currentLimitID'] === $wb->ids['Ladestrom'] && $f['chargeEnableID'] === $wb->ids['Ladefreigabe']
+pruefe($f['contractType'] === 'charger' && $f['function'] === 'charger' && $f['contractVersion'] === '1.13' && $f['failsafeSec'] === 0 && $f['currentLimitID'] === $wb->ids['Ladestrom'] && $f['chargeEnableID'] === $wb->ids['Ladefreigabe']
     && $f['plugStateID'] === $wb->ids['Angesteckt'] && $f['minCurrent'] === 6.0 && $f['maxCurrent'] === 32.0 && $f['phases'] === 3 && $f['manufacturer'] === 'Demo'
-    && $f['deviceSerial'] === 'SN1' && $f['sessionEnergyID'] === $wb->ids['SitzungEnergie'], 'Vertrag charger 1.12 feldgleich ChargerHub: IDs, 6–32 A, 3 Phasen, Hersteller, Seriennummer');
+    && $f['deviceSerial'] === 'SN1' && $f['sessionEnergyID'] === $wb->ids['SitzungEnergie'], 'Vertrag charger 1.13 feldgleich ChargerHub: contractType, IDs, 6–32 A, 3 Phasen, Hersteller, Seriennummer, Rückfall aus');
+
+// Rückfall (Totmann, Fremdanbindung): ohne Frist kein Timer; mit Frist läuft er, jeder Befehl zieht ihn neu auf.
+pruefe(($wb->timers['Rueckfall'] ?? -1) === 0, 'Rückfall ab Werk aus: kein Timer');
+$wb->props['FailsafeSec'] = 10;
+$wb->ApplyChanges();
+pruefe($wb->timers['Rueckfall'] === 30000 && $wb->GetFunctions()[0]['failsafeSec'] === 30 && $wb->GetFunctions()[0]['failsafeMode'] === 'maxCurrent',
+    'Frist 10 s wird auf 30 s angehoben, Vertrag meldet failsafeSec 30 und maxCurrent');
+$wb->SetChargeCurrent(8);
+$wb->SetChargeEnable(true);
+$wb->Rueckfall();
+pruefe($wb->attrs['FailsafeAktiv'] === true && $wb->attrs['SollFrei'] === true && $wb->attrs['SollStrom'] === 32.0 && $wb->timers['Rueckfall'] === 0
+    && strpos(implode('|', $wb->log), '(Rückfall)') !== false && json_decode($wb->GetState(), true)['failsafeActive'] === true,
+    'Frist abgelaufen: Höchststrom 32 A freigegeben, Meldung, Timer steht bis zum nächsten Befehl');
+$wb->SetChargeCurrent(10);
+pruefe($wb->attrs['FailsafeAktiv'] === false && $wb->timers['Rueckfall'] === 30000 && $wb->attrs['SollStrom'] === 10.0
+    && strpos(implode('|', $wb->log), 'Rückfall ist beendet') !== false, 'Nächster Steuerbefehl beendet den Rückfall und zieht die Frist neu auf');
+$wb->props['FailsafeSec'] = 300;
+$wb->props['FailsafeVerhalten'] = 1;
+$wb->ApplyChanges();
+$wb->RequestAction('Ladefreigabe', true);
+$wb->Rueckfall();
+pruefe($wb->attrs['SollFrei'] === false && $wb->vars['Ladefreigabe'] === false && $wb->GetFunctions()[0]['failsafeMode'] === 'pause'
+    && $wb->GetFunctions()[0]['failsafeSec'] === 300, 'Verhalten „Pausieren“: Frist 300 s abgelaufen, Laden pausiert');
+$wb->props['FailsafeSec'] = 0;
+$wb->ApplyChanges();
+pruefe($wb->attrs['FailsafeAktiv'] === false && $wb->timers['Rueckfall'] === 0, 'Frist 0: Rückfall aus und beendet');
+$wb->props['FailsafeVerhalten'] = 0;
+$wb->SetChargeEnable(true);
 
 $html = formular($wb);
 pruefe(strpos($html, 'Wallbox verbunden: Demo Wallbox X') !== false && strpos($html, 'Stromgrenze (OPEV): vorhanden') !== false

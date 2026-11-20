@@ -67,6 +67,11 @@ muss das eigene PV-Überschussladen ausgeschaltet sein, damit sie dem Energieman
 - **Gemeldete Ladeenergie ignorieren:** für Wallboxen mit unzuverlässigem Energiewert (Elli Charger Pro).
 - „Lädt“ gilt erst über dem 0,6-Fachen der Mindestleistung; Pausieren mit 0 A wird erst gesendet, wenn das
   Fahrzeug seinen Kommunikationsstandard gemeldet hat.
+- **Rückfall ohne Steuerbefehl** (ab 0.3.0, ab Werk aus): Nur sinnvoll, wenn ein Energiemanagement oder Skript
+  die Wallbox steuert. Kommt in der eingestellten Zeit (mindestens 30 s, empfohlen 300 s) kein neuer Ladestrom
+  und keine neue Freigabe, lädt das Modul selbst mit Höchststrom weiter oder pausiert - je nach Wahl. Der
+  nächste Steuerbefehl beendet den Rückfall. Fallen Symcon oder das Gateway ganz aus, verwirft die Wallbox
+  die Grenze ohnehin selbst (EEBUS-Heartbeat) und lädt nach ihrer eigenen Einstellung.
 
 ## Funktionen
 
@@ -74,7 +79,7 @@ muss das eigene PV-Überschussladen ausgeschaltet sein, damit sie dem Energieman
 |---|---|
 | `CHEEB_SetChargeCurrent(int $id, float $Ampere)` | bool: Ladestrom je Phase (wirkt sofort bzw. beim Anstecken) |
 | `CHEEB_SetChargeEnable(int $id, bool $Enable)` | bool: Laden freigeben oder pausieren |
-| `CHEEB_GetFunctions(int $id)` | Wallbox-Vertrag des NRG-Stack (`function` `charger`, Version 1.12) |
+| `CHEEB_GetFunctions(int $id)` | Wallbox-Vertrag des NRG-Stack (`contractType` `charger`, Version 1.13, mit `failsafeSec`/`failsafeMode`) |
 | `CHEEB_GetState(int $id)` | JSON: Zustand zur Diagnose |
 
 Steuerregeln nach evcc: Der Ladestrom wird als Pflichtgrenze je Phase geschickt (OPEV), bei vorhandener

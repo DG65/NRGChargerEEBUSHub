@@ -67,6 +67,11 @@ own PV surplus charging switched off so that they follow the energy management.
 - **Ignore reported charged energy:** for wallboxes with an unreliable energy value (Elli Charger Pro).
 - “Charging” only above 0.6 × the minimum power; pausing with 0 A is only sent once the vehicle has
   reported its communication standard.
+- **Fallback without control command** (from 0.3.0, off by default): only useful when an energy management or
+  script controls the wallbox. If no new charging current or release arrives within the set time (at least
+  30 s, 300 s recommended), the module keeps charging with maximum current or pauses, as chosen. The next
+  control command ends the fallback. If Symcon or the gateway fail completely, the wallbox drops the limit by
+  itself anyway (EEBUS heartbeat) and charges according to its own setting.
 
 ## Functions
 
@@ -74,7 +79,7 @@ own PV surplus charging switched off so that they follow the energy management.
 |---|---|
 | `CHEEB_SetChargeCurrent(int $id, float $Ampere)` | bool: charging current per phase (effective now or on plug-in) |
 | `CHEEB_SetChargeEnable(int $id, bool $Enable)` | bool: allow or pause charging |
-| `CHEEB_GetFunctions(int $id)` | NRG-Stack wallbox contract (`function` `charger`, version 1.12) |
+| `CHEEB_GetFunctions(int $id)` | NRG-Stack wallbox contract (`contractType` `charger`, version 1.13, with `failsafeSec`/`failsafeMode`) |
 | `CHEEB_GetState(int $id)` | JSON: state for diagnosis |
 
 Control rules as in evcc: the charging current is sent as an obligation limit per phase (OPEV), and as a
