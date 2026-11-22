@@ -60,6 +60,9 @@ muss das eigene PV-Überschussladen ausgeschaltet sein, damit sie dem Energieman
 
 ## Ladeeinstellungen (wie evcc)
 
+- **Gruppe (optional, ab 0.3.1):** freier Name wie „Garage“. Ladepunkte mit gleichem Namen fasst das Dashboard
+  im Energiefluss unter einem Knoten zusammen. Nur für die Anzeige, Messung und Steuerung bleiben unverändert.
+
 - **Strombereich:** Lädt das Fahrzeug über ISO 15118-2, gilt der Bereich, den es selbst meldet. Bei IEC 61851
   meldet die Wallbox nur pauschal 6/16 A, dann gilt der eingestellte Mindest- und Höchststrom.
 - **Nur ganze Ampere:** für Wallboxen, die intern auf ganze Ampere runden (Elli Charger Connect/Pro der ersten
@@ -79,7 +82,7 @@ muss das eigene PV-Überschussladen ausgeschaltet sein, damit sie dem Energieman
 |---|---|
 | `CHEEB_SetChargeCurrent(int $id, float $Ampere)` | bool: Ladestrom je Phase (wirkt sofort bzw. beim Anstecken) |
 | `CHEEB_SetChargeEnable(int $id, bool $Enable)` | bool: Laden freigeben oder pausieren |
-| `CHEEB_GetFunctions(int $id)` | Wallbox-Vertrag des NRG-Stack (`contractType` `charger`, Version 1.13, mit `failsafeSec`, `failsafeMode` `deadman`, `failsafeLimitA`) |
+| `CHEEB_GetFunctions(int $id)` | Wallbox-Vertrag des NRG-Stack (`contractType` `charger`, Version 1.14, mit `groupName`, mit `failsafeSec`, `failsafeMode` `deadman`, `failsafeLimitA`) |
 | `CHEEB_GetState(int $id)` | JSON: Zustand zur Diagnose |
 
 Steuerregeln nach evcc: Der Ladestrom wird als Pflichtgrenze je Phase geschickt (OPEV), bei vorhandener

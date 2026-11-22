@@ -14,6 +14,9 @@ trait CHEEBFormular
 {
     // „Was ist neu": Schlüssel = Version ohne Beta-/Build-Suffix.
     private static $CHEEB_NEWS_VERSIONS = [
+        '0.3.1' => [
+            '• 🗂️ New “Group (optional)” in “Charging settings”: charge points with the same group name are shown together under one node in the Dashboard energy flow. Only for display, measuring and control stay unchanged (contract 1.14).',
+        ],
         '0.3.0' => [
             '• 🛟 New fallback for control by an energy management or script: if no control command arrives for the set time, the module keeps charging with maximum current or pauses, as chosen in “Charging settings” (off by default).',
             '• 🔗 Wallbox contract 1.13: describes itself with its type and the fallback time, so that energy managements of other authors can find it as well.',

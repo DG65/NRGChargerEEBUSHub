@@ -321,9 +321,16 @@ pruefe(($GLOBALS['PROFILE']['NRG.Ampere']['_suffix'] ?? '') === ' A' && ($GLOBAL
     'Profile wie ChargerHub: NRG.Ampere, Sitzungsenergie mit eigenem Suffix (keine Zählerverwechslung in MeterHub)');
 
 $f = $wb->GetFunctions()[0];
-pruefe($f['contractType'] === 'charger' && $f['function'] === 'charger' && $f['contractVersion'] === '1.13' && $f['failsafeSec'] === 0 && $f['currentLimitID'] === $wb->ids['Ladestrom'] && $f['chargeEnableID'] === $wb->ids['Ladefreigabe']
+pruefe($f['contractType'] === 'charger' && $f['function'] === 'charger' && $f['contractVersion'] === '1.14' && $f['failsafeSec'] === 0 && $f['groupName'] === '' && $f['currentLimitID'] === $wb->ids['Ladestrom'] && $f['chargeEnableID'] === $wb->ids['Ladefreigabe']
     && $f['plugStateID'] === $wb->ids['Angesteckt'] && $f['minCurrent'] === 6.0 && $f['maxCurrent'] === 32.0 && $f['phases'] === 3 && $f['manufacturer'] === 'Demo'
-    && $f['deviceSerial'] === 'SN1' && $f['sessionEnergyID'] === $wb->ids['SitzungEnergie'], 'Vertrag charger 1.13 feldgleich ChargerHub: contractType, IDs, 6–32 A, 3 Phasen, Hersteller, Seriennummer, Rückfall aus');
+    && $f['deviceSerial'] === 'SN1' && $f['sessionEnergyID'] === $wb->ids['SitzungEnergie'], 'Vertrag charger 1.14 feldgleich ChargerHub: contractType, IDs, 6–32 A, 3 Phasen, Hersteller, Seriennummer, Rückfall aus, keine Gruppe');
+$wb->props['GroupName'] = '  Garage  ';
+$g1 = $wb->GetFunctions()[0]['groupName'];
+$wb->props['GroupName'] = str_repeat('ä', 100);
+$g2 = $wb->GetFunctions()[0]['groupName'];
+$wb->props['GroupName'] = '';
+pruefe($g1 === 'Garage' && mb_strlen($g2) === 60 && strpos(json_encode(json_decode($wb->GetConfigurationForm(), true)), 'GroupName') !== false,
+    'Vertrag 1.14: groupName getrimmt, auf 60 Zeichen begrenzt (mehrbytig), Feld im Formular');
 
 // Rückfall (Totmann, Fremdanbindung): ohne Frist kein Timer; mit Frist läuft er, jeder Befehl zieht ihn neu auf.
 pruefe(($wb->timers['Rueckfall'] ?? -1) === 0, 'Rückfall ab Werk aus: kein Timer');

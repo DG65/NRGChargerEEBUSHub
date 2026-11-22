@@ -60,6 +60,9 @@ own PV surplus charging switched off so that they follow the energy management.
 
 ## Charging settings (like evcc)
 
+- **Group (optional, from 0.3.1):** a free name such as “Garage”. The Dashboard energy flow shows charge points
+  with the same name together under one node. Only for display, measuring and control stay unchanged.
+
 - **Current range:** if the vehicle charges via ISO 15118-2, the range it reports applies. With IEC 61851 the
   wallbox only reports a general 6/16 A; then the configured minimum and maximum current apply.
 - **Only whole amperes:** for wallboxes rounding to whole amperes internally (Elli Charger Connect/Pro of the
@@ -79,7 +82,7 @@ own PV surplus charging switched off so that they follow the energy management.
 |---|---|
 | `CHEEB_SetChargeCurrent(int $id, float $Ampere)` | bool: charging current per phase (effective now or on plug-in) |
 | `CHEEB_SetChargeEnable(int $id, bool $Enable)` | bool: allow or pause charging |
-| `CHEEB_GetFunctions(int $id)` | NRG-Stack wallbox contract (`contractType` `charger`, version 1.13, with `failsafeSec`, `failsafeMode` `deadman`, `failsafeLimitA`) |
+| `CHEEB_GetFunctions(int $id)` | NRG-Stack wallbox contract (`contractType` `charger`, version 1.14, with `groupName`, with `failsafeSec`, `failsafeMode` `deadman`, `failsafeLimitA`) |
 | `CHEEB_GetState(int $id)` | JSON: state for diagnosis |
 
 Control rules as in evcc: the charging current is sent as an obligation limit per phase (OPEV), and as a

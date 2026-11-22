@@ -29,7 +29,7 @@ class ChargerEEBUSHub extends IPSModule
 
     private const GATEWAY_MODULE = '{32809AEC-3A90-455F-8FE4-188DF37D594F}';
     private const DATA_ZUM_GATEWAY = '{26D4DA14-6C0D-4686-AE00-D23234BAD90D}';
-    private const CONTRACT_VERSION = '1.13';
+    private const CONTRACT_VERSION = '1.14';
     // Rückfall (Fremdanbindung, SUITE.md): kürzeste erlaubte Frist, damit ein Konsument mit failsafeSec/2 nachschreiben kann.
     private const RUECKFALL_MIN_S = 30;
     private const RUECKFALL_MODI = [0 => 'maxCurrent', 1 => 'pause'];
@@ -60,6 +60,9 @@ class ChargerEEBUSHub extends IPSModule
         // Höchststrom (wie ohne Energiemanagement), 1 = pausieren.
         $this->RegisterPropertyInteger('FailsafeSec', 0);
         $this->RegisterPropertyInteger('FailsafeVerhalten', 0);
+        // Freier Gruppenname (wie ChargerHub 0.16.0): rein organisatorisch, das Dashboard fasst Ladepunkte mit
+        // gleichem Namen im Energiefluss zusammen. Gemeldet als groupName (Vertrag 1.14), leer = keine Gruppe.
+        $this->RegisterPropertyString('GroupName', '');
         // Stand der Wallbox und des Fahrzeugs (Entitäten, Kennungen, Grenzen) zwischen zwei Meldungen.
         $this->RegisterAttributeString('Geraet', '{}');
         $this->RegisterAttributeInteger('LastSeenAt', 0);
@@ -849,7 +852,7 @@ class ChargerEEBUSHub extends IPSModule
     // Verbund-Vertrag (charger, feldgleich ChargerHub/OCPPHub)
     // ------------------------------------------------------------------
 
-    /** CHEEB_GetFunctions($id): array — Wallbox-Vertrag 1.13 wie CHUB_GetFunctions (contractType, failsafeSec). */
+    /** CHEEB_GetFunctions($id): array — Wallbox-Vertrag 1.14 wie CHUB_GetFunctions (contractType, failsafeSec, groupName). */
     public function GetFunctions(): array
     {
         $id = function (string $ident): int {
@@ -899,6 +902,8 @@ class ChargerEEBUSHub extends IPSModule
             'failsafeSec'        => $this->failsafeSec(),
             'failsafeMode'       => 'deadman',
             'failsafeLimitA'     => $this->failsafeModus() === 'pause' ? 0.0 : max($max, $this->ReadPropertyFloat('MaxStrom')),
+            // 1.14: Gruppenname (SUITE.md 5d-CHUB-1.14), getrimmt, höchstens 60 Zeichen, '' = keine Gruppe.
+            'groupName'          => mb_substr(trim($this->ReadPropertyString('GroupName')), 0, 60),
         ];
         if (!empty($g['ec']['phasen'])) {
             $fn['phases'] = (int)$g['ec']['phasen'] >= 3 ? 3 : 1;
@@ -1002,6 +1007,8 @@ class ChargerEEBUSHub extends IPSModule
         $einstellungen = [
             'type' => 'ExpansionPanel', 'expanded' => false, 'caption' => '⚙️  Charging settings',
             'items' => [
+                ['type' => 'ValidationTextBox', 'name' => 'GroupName', 'caption' => 'Group (optional)'],
+                ['type' => 'Label', 'name' => 'GroupNameHint', 'caption' => 'A free name such as “Garage” or “Charging park”. Charge points with the same name are shown together under one node in the Dashboard energy flow (a click opens the individual charge points). Only for display: measuring and control stay unchanged. Empty = no group.'],
                 ['type' => 'Label', 'caption' => 'Vehicles charging via ISO 15118 report their current range themselves. With IEC 61851 the wallbox only reports a general 6/16 A, so the range set here applies.'],
                 ['type' => 'NumberSpinner', 'name' => 'MinStrom', 'caption' => 'Minimum charging current (IEC 61851)', 'suffix' => 'A', 'minimum' => 0, 'maximum' => 63, 'digits' => 1],
                 ['type' => 'NumberSpinner', 'name' => 'MaxStrom', 'caption' => 'Maximum charging current (IEC 61851)', 'suffix' => 'A', 'minimum' => 0, 'maximum' => 63, 'digits' => 1],

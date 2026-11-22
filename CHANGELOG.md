@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1 (Build 5, 22.11.2026)
+
+- Vertrag `charger` 1.14 wie ChargerHub 0.16.0 (SUITE.md 5d-CHUB-1.14): neue Eigenschaft `GroupName`
+  („Gruppe (optional)“ in „Ladeeinstellungen“), gemeldet als `groupName` (getrimmt, höchstens 60 Zeichen,
+  '' = keine Gruppe). Rein organisatorisch für den Energiefluss im Dashboard.
+
 ## 0.3.0 (Build 4, 20.11.2026)
 
 - Fremdanbindung (SUITE.md „Fremdanbindung: Module anderer Autoren“): Vertrag `charger` 1.13 mit `contractType`
